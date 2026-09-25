@@ -1,0 +1,62 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Packaging/build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Environment / secrets
+.env
+.env.*
+.envrc
+secrets.json
+*.pem
+*.key
+
+# Local data / generated outputs
+*.log
+*.sqlite3
+*.db
+output/
+results/
+artifacts/
+reports/
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# pip / dependency cache
+pip-wheel-metadata/
+
+# Optional: allow committed templates if needed
+# data/templates/
