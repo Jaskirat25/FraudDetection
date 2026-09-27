@@ -86,12 +86,12 @@ def main():
     print(f"[HARD REJECT]: {report.hard_reject}")
     
     if report.tier1_violations:
-        print(f"\n--- Conclusive Tier-1 Violations ---")
+        print(f"\n--- Conclusive Tier-1 Violations (Immediate Fraud) ---")
         for v in report.tier1_violations:
-            print(f"  * {v}")
+            print(f"  🚨 {v}")
 
     if report.tier2_contributions:
-        print(f"\n--- Tier-2 Risk Breakdown ---")
+        print(f"\n--- Tier-2 Risk Contributions ---")
         for c in report.tier2_contributions:
             print(f"  * +{c['points']} pts: {c['reason']}")
 

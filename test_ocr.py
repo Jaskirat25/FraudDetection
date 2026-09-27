@@ -23,7 +23,7 @@ def main():
     if len(sys.argv) > 1:
         image_path = sys.argv[1]
     else:
-        image_path = "WhatsApp Image 2026-09-24 at 12.09.37 AM.jpeg"
+        image_path = "WhatsApp Image 2026-09-27 at 5.05.50 PM.jpeg"
         if not os.path.exists(image_path):
             image_path = "sample.jpg"
 

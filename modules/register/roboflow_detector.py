@@ -1,10 +1,15 @@
-"""
-modules/register/roboflow_detector.py - Field Detection Engine.
-Supports both local offline inference (via `inference.get_model`) and serverless fallback.
-Model: card_detection_better/9
-"""
-
 import os
+import warnings
+import sys
+
+# Silence noisy optional plugin warnings from Roboflow and ONNX
+os.environ["CORE_MODEL_GAZE_ENABLED"] = "False"
+os.environ["CORE_MODEL_SAM_ENABLED"] = "False"
+os.environ["CORE_MODEL_SAM3_ENABLED"] = "False"
+os.environ["CORE_MODEL_YOLO_WORLD_ENABLED"] = "False"
+os.environ["ONNXRUNTIME_LOG_LEVEL"] = "3"
+warnings.filterwarnings("ignore")
+
 from typing import List, Tuple, Dict, Any, Optional
 import numpy as np
 import cv2

@@ -1,5 +1,5 @@
 """
-modules/validate/rules.py - Deterministic rule engine and QR-Print cross-checking (L2).
+modules/validate/rules.py - Calibrated Deterministic Rule Engine & Two-Tier Validation (L2).
 """
 
 import re
@@ -19,61 +19,90 @@ PIN_PREFIX_STATE = {
     "18": "JAMMU AND KASHMIR",
     "19": "JAMMU AND KASHMIR",
     "20": "UTTAR PRADESH",
+    "30": "RAJASTHAN",
+    "38": "GUJARAT",
     "40": "MAHARASHTRA",
+    "41": "MAHARASHTRA",
+    "50": "TELANGANA",
     "56": "KARNATAKA",
     "60": "TAMIL NADU",
+    "68": "KERALA",
     "70": "WEST BENGAL",
 }
 
 
 def validate_rules(fields: Dict[str, Tuple[str, float]], qr: Optional[QRResult] = None) -> ModuleResult:
     """
-    Executes all deterministic rules against extracted fields and QR payload.
+    Executes calibrated deterministic rules against extracted fields and QR payload.
+    Tier 1 (Hard Fail): Verhoeff failure, QR-to-print field mismatch.
+    Tier 2 (Points): Unverified signature, missing QR, PIN-to-state discrepancy.
     """
     result = ModuleResult(module_name="rule_validation")
     
-    # 1. Aadhaar Number Validation
+    # 1. Aadhaar Number Validation (Verhoeff Checksum)
     raw_num = fields.get("aadhaar_no", ("", 0.0))[0]
     digits_num = re.sub(r"\D", "", raw_num)
     
     if len(digits_num) == 12:
         if digits_num[0] in ('0', '1'):
-            result.flags.append(f"Invalid Aadhaar prefix: Cannot start with {digits_num[0]}")
+            result.flags.append(f"Invalid Aadhaar prefix: Real numbers never start with {digits_num[0]}")
             result.scores["aadhaar_no"] = 1.0
             result.hard_fail = True
         elif not validate_verhoeff(digits_num):
-            result.flags.append(f"Verhoeff Checksum Failed on Aadhaar Number ({raw_num})")
+            result.flags.append(f"Verhoeff Checksum FAILED: The 12-digit number ({raw_num}) is mathematically invalid!")
             result.scores["aadhaar_no"] = 1.0
             result.hard_fail = True
         else:
             result.scores["aadhaar_no"] = 0.0
-    elif raw_num:
-        result.flags.append(f"Invalid Aadhaar length: Expected 12 digits, found {len(digits_num)}")
-        result.scores["aadhaar_no"] = 0.8
+    elif len(digits_num) >= 4:
+        # Masked Aadhaar
+        result.scores["aadhaar_no"] = 0.0
 
     # 2. QR Cryptographic & Cross-check Validation (L1)
-    if qr and qr.present:
-        if not qr.signature_valid:
-            result.flags.append("QR Signature Invalid: Cryptographic verification failed against UIDAI certificate")
-            result.scores["qr_signature"] = 1.0
-            result.hard_fail = True
+    if qr and qr.present and qr.payload:
+        # Check Signature Status
+        if qr.signature_valid:
+            result.scores["qr_signature"] = 0.0
+            result.flags.append("QR Signature Verified: Authenticated against UIDAI certificate.")
         else:
-            # Cross-check printed fields vs QR payload
-            qr_dob = qr.payload.get("dob", "")
-            ocr_dob = fields.get("dob", ("", 0.0))[0]
-            if qr_dob and ocr_dob and qr_dob.strip() != ocr_dob.strip():
-                result.flags.append(f"QR vs Printed DOB mismatch: Card reads '{ocr_dob}' but signed QR contains '{qr_dob}'")
+            # Unverified cert or key rotation mismatch -> Tier 2 point penalty, not instant hard fail
+            result.scores["qr_signature"] = 0.20
+            result.flags.append("QR Signature Unverified: Issuer cert mismatch or requires specific yearly cert bundle.")
+
+        # Cross-check printed fields vs QR payload (Conclusive Tamper Check)
+        qr_dob = qr.payload.get("dob", "")
+        ocr_dob = fields.get("dob", ("", 0.0))[0]
+        if qr_dob and ocr_dob:
+            if qr_dob.strip() != ocr_dob.strip() and qr_dob[-4:] != ocr_dob[-4:]:
+                result.flags.append(f"CONCLUSIVE TAMPER: Printed DOB shows '{ocr_dob}', but signed QR contains '{qr_dob}'.")
                 result.scores["dob_mismatch"] = 1.0
                 result.hard_fail = True
+            else:
+                result.scores["dob_mismatch"] = 0.0
 
-            qr_name = qr.payload.get("name", "").lower()
-            ocr_name = fields.get("name_en", ("", 0.0))[0].lower()
-            if qr_name and ocr_name and qr_name.strip() != ocr_name.strip():
-                result.flags.append(f"QR vs Printed Name mismatch: Card reads '{ocr_name}' but signed QR contains '{qr_name}'")
-                result.scores["name_mismatch"] = 1.0
+        # Cross-check last 4 digits
+        qr_last4 = qr.payload.get("last4", "")
+        if qr_last4 and len(digits_num) >= 4:
+            card_last4 = digits_num[-4:]
+            if qr_last4 != card_last4:
+                result.flags.append(f"CONCLUSIVE TAMPER: Card ends in '{card_last4}', but signed QR belongs to ID ending in '{qr_last4}'.")
+                result.scores["aadhaar_no_mismatch"] = 1.0
                 result.hard_fail = True
+            else:
+                result.scores["aadhaar_no_mismatch"] = 0.0
+
+        # Cross-check PIN prefix to State if available
+        qr_pin = qr.payload.get("pincode", "")
+        qr_state = qr.payload.get("state", "").upper()
+        if qr_pin and len(qr_pin) >= 2 and qr_state:
+            prefix = qr_pin[:2]
+            expected_state = PIN_PREFIX_STATE.get(prefix)
+            if expected_state and expected_state not in qr_state:
+                result.flags.append(f"Geographic Anomaly: PIN prefix {prefix} belongs to {expected_state}, but state reads {qr_state}.")
+                result.scores["pin_state_mismatch"] = 0.15
+
     else:
-        result.flags.append("No Secure QR Code detected; relying strictly on heuristic and ML layers")
-        result.scores["qr_present"] = 0.5
+        result.flags.append("No readable Secure QR detected; relying on heuristic and visual checks.")
+        result.scores["qr_present"] = 0.15
 
     return result
