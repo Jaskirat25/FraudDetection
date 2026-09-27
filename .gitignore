@@ -31,6 +31,8 @@ secrets.json
 *.log
 *.sqlite3
 *.db
+*.jpg
+*.jpeg
 output/
 results/
 artifacts/
