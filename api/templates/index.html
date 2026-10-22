@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aadhaar Authenticity Screening System | Defense-in-Depth Pipeline</title>
+  
+  <!-- Tailwind CSS & Inter Font -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    @keyframes scan {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(1000%); }
+    }
+    .animate-scan {
+      animation: scan 2s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+          <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base font-bold tracking-tight text-white">Aadhaar Authenticity Screening</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">v1.0 (5-Layer)</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Deterministic Cryptographic & Biometric Fraud Defense</p>
+        </div>
+      </div>
+
+      <!-- Trust Store Status Badges -->
+      <div class="flex items-center space-x-3 text-xs">
+        <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-slate-300 font-mono">UIDAI Trust Store: 8 Certs</span>
+        </div>
+        <div class="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          <span class="text-slate-300 font-mono">Offline YOLO + SFace Active</span>
+        </div>
+        <a href="https://github.com" target="_blank" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="github" class="w-4 h-4"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workstation Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: Input & Document Intake (Cols 1-5) -->
+    <section class="lg:col-span-5 space-y-6">
+
+      <!-- Document Upload Card -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <div class="p-1.5 bg-blue-500/10 rounded-lg text-blue-400">
+              <i data-lucide="credit-card" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Aadhaar Card Intake</h2>
+          </div>
+          <span class="text-xs text-slate-400">Step 1</span>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <div id="drop-zone" class="border-2 border-dashed border-slate-700/80 hover:border-blue-500/60 rounded-xl p-4 text-center cursor-pointer transition bg-slate-950/40 relative group overflow-hidden">
+          <input type="file" id="card-file-input" accept="image/*" class="hidden" />
+          
+          <div id="drop-empty-state" class="py-6 space-y-3">
+            <div class="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto group-hover:scale-110 transition duration-200">
+              <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-200">Click to upload or drag card photo</p>
+              <p class="text-xs text-slate-400 mt-1">Supports JPG, PNG, WEBP (Front, Back, or Combined)</p>
+            </div>
+          </div>
+
+          <!-- Selected Preview -->
+          <div id="drop-preview-state" class="hidden relative">
+            <img id="card-preview-img" src="" alt="Card Preview" class="w-full max-h-48 object-contain rounded-lg border border-slate-800 mx-auto" />
+            <button type="button" id="clear-card-btn" class="absolute top-2 right-2 p-1.5 bg-slate-900/90 hover:bg-red-500/80 text-white rounded-lg transition border border-slate-700">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <p id="card-preview-name" class="text-xs font-mono text-slate-400 mt-2 truncate text-center"></p>
+          </div>
+        </div>
+
+        <!-- Rapid Sample Document Chips -->
+        <div class="mt-4 pt-4 border-t border-slate-800/80">
+          <label class="text-xs font-semibold text-slate-400 block mb-2">Or Select Instant Demo Document:</label>
+          <div class="space-y-2" id="samples-container">
+            <!-- Sample chips loaded via JS -->
+            <div class="animate-pulse flex space-x-2">
+              <div class="h-8 bg-slate-800 rounded-lg flex-1"></div>
+              <div class="h-8 bg-slate-800 rounded-lg flex-1"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Webcam / Selfie Card -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <div class="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+              <i data-lucide="camera" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Live Biometric Capture</h2>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">Optional</span>
+        </div>
+
+        <p class="text-xs text-slate-400 mb-3">Enables 3-Way verification (Card Photo ↔ QR Photo ↔ Live Selfie) to stop onboarding impostors.</p>
+
+        <!-- Webcam Container -->
+        <div class="relative bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+          <video id="webcam-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+          <canvas id="webcam-canvas" class="hidden"></canvas>
+          <img id="selfie-preview-img" src="" alt="Captured Selfie" class="w-full h-full object-cover hidden" />
+
+          <!-- Webcam Idle State -->
+          <div id="webcam-idle-state" class="text-center p-4">
+            <div class="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-2">
+              <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+            <p class="text-xs text-slate-400">Webcam inactive</p>
+          </div>
+        </div>
+
+        <!-- Webcam Controls -->
+        <div class="mt-3 flex items-center justify-between space-x-2">
+          <button type="button" id="toggle-camera-btn" class="flex-1 py-2 px-3 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center space-x-1.5">
+            <i data-lucide="video" class="w-3.5 h-3.5"></i>
+            <span id="camera-btn-text">Start Webcam</span>
+          </button>
+
+          <button type="button" id="capture-selfie-btn" disabled class="py-2 px-4 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 text-white transition flex items-center space-x-1.5">
+            <i data-lucide="aperture" class="w-3.5 h-3.5"></i>
+            <span>Snap Photo</span>
+          </button>
+
+          <button type="button" id="clear-selfie-btn" class="hidden p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Screening Button -->
+      <button type="button" id="run-screen-btn" class="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/25 transition duration-200 flex items-center justify-center space-x-2 ring-1 ring-white/20 active:scale-[0.99]">
+        <i data-lucide="scan" class="w-5 h-5"></i>
+        <span>Execute 5-Layer Screening Pipeline</span>
+      </button>
+    </section>
+
+    <!-- RIGHT COLUMN: Real-Time Diagnostic Dashboard (Cols 6-12) -->
+    <section class="lg:col-span-7 space-y-6">
+
+      <!-- Initial / Empty State Placeholder -->
+      <div id="results-empty-state" class="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[500px]">
+        <div class="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-4 ring-1 ring-blue-500/20">
+          <i data-lucide="file-search" class="w-8 h-8"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-200">Awaiting Document Intake</h3>
+        <p class="text-xs text-slate-400 max-w-sm mt-1.5 leading-relaxed">
+          Upload an Aadhaar card image or select one of the instant demo cards to execute cryptographic verification, Verhoeff math, and 3-way biometrics.
+        </p>
+
+        <!-- 5-Layer Defensive Overview Diagram -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-8 w-full max-w-lg text-left text-xs font-mono">
+          <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-blue-400 block font-bold">L1: RSA-2048</span>
+            <span class="text-slate-400 text-[11px]">Secure QR Verification</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-indigo-400 block font-bold">L2: Verhoeff</span>
+            <span class="text-slate-400 text-[11px]">D5 Checksum Validation</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-violet-400 block font-bold">L3: Field YOLO</span>
+            <span class="text-slate-400 text-[11px]">Offline Crop Extraction</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+            <span class="text-purple-400 block font-bold">L4: Target OCR</span>
+            <span class="text-slate-400 text-[11px]">Unsharp Mask Extraction</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800 col-span-2 sm:col-span-1">
+            <span class="text-emerald-400 block font-bold">L5: 3-Way Face</span>
+            <span class="text-slate-400 text-[11px]">Card ↔ QR ↔ Live Selfie</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Spinner / Active Pipeline State -->
+      <div id="results-loading-state" class="hidden bg-slate-900/60 border border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden">
+        <div class="absolute inset-0 bg-blue-600/5 animate-pulse"></div>
+        <div class="relative w-16 h-16 mb-4">
+          <div class="w-16 h-16 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"></div>
+          <i data-lucide="shield" class="w-6 h-6 text-blue-400 absolute inset-0 m-auto"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-100">Executing Multi-Layer Screening...</h3>
+        <p class="text-xs text-slate-400 mt-2 font-mono" id="pipeline-status-text">Decoding V5 BigInt QR Stream & Cross-Referencing Trust Store...</p>
+      </div>
+
+      <!-- ACTIVE SCREENING RESULTS CONTAINER (Populated dynamically) -->
+      <div id="results-content-state" class="hidden space-y-6">
+
+        <!-- 1. Master Verdict Banner -->
+        <div id="verdict-banner" class="rounded-2xl p-6 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition duration-300">
+          <div class="flex items-center space-x-4">
+            <div id="verdict-icon-container" class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0">
+              <i id="verdict-icon" data-lucide="shield-check" class="w-8 h-8"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs uppercase font-mono tracking-widest text-slate-400 font-semibold">Screening Verdict</span>
+                <span id="hard-reject-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500 text-white uppercase tracking-wider">Hard Reject</span>
+              </div>
+              <h2 id="verdict-title" class="text-2xl font-black tracking-tight mt-0.5">LOW RISK (GENUINE)</h2>
+              <p id="verdict-subtitle" class="text-xs text-slate-300 mt-0.5">All cryptographic anchors and biometric comparisons verified.</p>
+            </div>
+          </div>
+
+          <!-- Risk Score Gauge -->
+          <div class="text-right sm:border-l sm:border-slate-800 sm:pl-6">
+            <span class="text-xs font-mono text-slate-400 uppercase tracking-wider">Aggregated Risk</span>
+            <div class="text-3xl font-black font-mono mt-0.5 flex items-baseline justify-end space-x-1">
+              <span id="risk-score-value">0.0</span>
+              <span class="text-xs text-slate-400 font-normal">/ 100</span>
+            </div>
+            <span id="execution-time-label" class="text-[11px] font-mono text-slate-400 block mt-0.5">Processed in 0.8s</span>
+          </div>
+        </div>
+
+        <!-- 2. Layer 5: 3-Way Face Biometric Hub -->
+        <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <div class="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">
+                <i data-lucide="users" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-slate-200">Layer 5: 3-Way Biometric Face Match Hub</h3>
+                <p class="text-[11px] text-slate-400">YuNet Landmark Alignment & SFace 128-D Cosine Verification</p>
+              </div>
+            </div>
+            <span id="biometrics-summary-badge" class="text-xs font-mono font-medium px-2.5 py-1 rounded-lg"></span>
+          </div>
+
+          <!-- 3 Side-by-Side Face Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Face 1: Physical Card Photo -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center text-center">
+              <span class="text-[11px] font-mono text-slate-400 font-semibold mb-2">1. Card Photo (YOLO)</span>
+              <div class="w-24 h-24 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center mb-2">
+                <img id="bio-card-face" src="" alt="Card Face" class="w-full h-full object-cover hidden" />
+                <span id="bio-card-empty" class="text-[10px] text-slate-500">No Face</span>
+              </div>
+              <span id="bio-card-status" class="text-[10px] font-mono text-slate-400">Localized</span>
+            </div>
+
+            <!-- Face 2: QR Embedded Photo (Ground Truth) -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center text-center relative ring-1 ring-blue-500/20">
+              <span class="text-[11px] font-mono text-blue-400 font-semibold mb-2">2. QR Signed (UIDAI)</span>
+              <div class="w-24 h-24 rounded-lg bg-slate-900 border border-blue-500/30 overflow-hidden flex items-center justify-center mb-2 shadow-inner">
+                <img id="bio-qr-face" src="" alt="QR Face" class="w-full h-full object-cover hidden" />
+                <span id="bio-qr-empty" class="text-[10px] text-slate-500">No Photo</span>
+              </div>
+              <span id="bio-qr-status" class="text-[10px] font-mono text-blue-300">RSA-2048 Signed</span>
+            </div>
+
+            <!-- Face 3: Live Selfie -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col items-center text-center">
+              <span class="text-[11px] font-mono text-slate-400 font-semibold mb-2">3. Live Selfie (Webcam)</span>
+              <div class="w-24 h-24 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center mb-2">
+                <img id="bio-live-face" src="" alt="Live Face" class="w-full h-full object-cover hidden" />
+                <span id="bio-live-empty" class="text-[10px] text-slate-500">Not Captured</span>
+              </div>
+              <span id="bio-live-status" class="text-[10px] font-mono text-slate-400">Standby</span>
+            </div>
+          </div>
+
+          <!-- Pairwise Metric Comparison Badges -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800">
+            <!-- Pair 1: Card <-> QR (Photo Swap) -->
+            <div id="pair-card-qr-box" class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-xs font-semibold text-slate-200 block">Card Photo ↔ QR Photo</span>
+                <span class="text-[11px] text-slate-400">Detects Photo-Swap Forgery (F1)</span>
+              </div>
+              <div class="text-right">
+                <span id="pair-card-qr-score" class="text-xs font-mono font-bold block">--</span>
+                <span id="pair-card-qr-badge" class="text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5">--</span>
+              </div>
+            </div>
+
+            <!-- Pair 2: QR <-> Live (Impostor Anchor) -->
+            <div id="pair-qr-live-box" class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-xs font-semibold text-slate-200 block">QR Photo ↔ Live Selfie</span>
+                <span class="text-[11px] text-slate-400">Cryptographic Identity Anchor</span>
+              </div>
+              <div class="text-right">
+                <span id="pair-qr-live-score" class="text-xs font-mono font-bold block">--</span>
+                <span id="pair-qr-live-badge" class="text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5">Standby</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Layer 1: Cryptographic Anchor & Certificate Window -->
+        <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <div class="p-1.5 bg-blue-500/10 rounded-lg text-blue-400">
+                <i data-lucide="key-round" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-slate-200">Layer 1: Secure QR Cryptographic Anchor</h3>
+                <p class="text-[11px] text-slate-400">Big-Integer Stream RSA-2048 Digital Signature & Trust Store</p>
+              </div>
+            </div>
+            <span id="crypto-validity-badge" class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg"></span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-slate-400 block text-[10px] uppercase">Active Certificate</span>
+              <span id="crypto-cert-name" class="font-bold text-slate-200 mt-1 block truncate">--</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-slate-400 block text-[10px] uppercase">Issue Timestamp</span>
+              <span id="crypto-timestamp" class="font-bold text-slate-200 mt-1 block">--</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-slate-400 block text-[10px] uppercase">QR Format</span>
+              <span id="crypto-version" class="font-bold text-slate-200 mt-1 block">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Layer 2 & 4: Printed OCR vs QR Cross-Check Table -->
+        <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <div class="p-1.5 bg-purple-500/10 rounded-lg text-purple-400">
+                <i data-lucide="table-2" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-slate-200">Layer 2 & 4: Printed Card (OCR) vs. Signed Digital Payload (QR)</h3>
+                <p class="text-[11px] text-slate-400">Instant detection of Photoshop text overwrite on card surface</p>
+              </div>
+            </div>
+            <div id="verhoeff-status-pill" class="text-xs font-mono font-medium px-2 py-0.5 rounded-full"></div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+                  <th class="py-2.5 px-3">Field</th>
+                  <th class="py-2.5 px-3">Printed Text (OCR)</th>
+                  <th class="py-2.5 px-3">Signed QR Payload</th>
+                  <th class="py-2.5 px-3 text-right">Match Status</th>
+                </tr>
+              </thead>
+              <tbody id="cross-check-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5. Diagnostic Audit Log -->
+        <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center space-x-2 mb-3">
+            <div class="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">
+              <i data-lucide="list-tree" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-200">Diagnostic Findings & Explainable Audit Log</h3>
+          </div>
+
+          <div id="diagnostic-findings-list" class="space-y-2 text-xs font-mono">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Application Logic -->
+  <script>
+    // State
+    let selectedCardFile = null;
+    let selectedCardSample = null;
+    let liveSelfieDataUrl = null;
+    let webcamStream = null;
+
+    // Elements
+    const dropZone = document.getElementById('drop-zone');
+    const cardFileInput = document.getElementById('card-file-input');
+    const dropEmptyState = document.getElementById('drop-empty-state');
+    const dropPreviewState = document.getElementById('drop-preview-state');
+    const cardPreviewImg = document.getElementById('card-preview-img');
+    const cardPreviewName = document.getElementById('card-preview-name');
+    const clearCardBtn = document.getElementById('clear-card-btn');
+    const samplesContainer = document.getElementById('samples-container');
+
+    const webcamVideo = document.getElementById('webcam-video');
+    const webcamCanvas = document.getElementById('webcam-canvas');
+    const selfiePreviewImg = document.getElementById('selfie-preview-img');
+    const webcamIdleState = document.getElementById('webcam-idle-state');
+    const toggleCameraBtn = document.getElementById('toggle-camera-btn');
+    const cameraBtnText = document.getElementById('camera-btn-text');
+    const captureSelfieBtn = document.getElementById('capture-selfie-btn');
+    const clearSelfieBtn = document.getElementById('clear-selfie-btn');
+
+    const runScreenBtn = document.getElementById('run-screen-btn');
+    const resultsEmptyState = document.getElementById('results-empty-state');
+    const resultsLoadingState = document.getElementById('results-loading-state');
+    const resultsContentState = document.getElementById('results-content-state');
+    const pipelineStatusText = document.getElementById('pipeline-status-text');
+
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // 1. Fetch & Render Demo Sample Documents
+    async function loadSamples() {
+      try {
+        const res = await fetch('/api/samples');
+        const data = await res.json();
+        samplesContainer.innerHTML = '';
+        
+        data.samples.forEach(sample => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/80 hover:border-slate-700 transition flex items-center justify-between group';
+          btn.onclick = () => selectSampleCard(sample);
+
+          btn.innerHTML = `
+            <div class="flex items-center space-x-2.5 overflow-hidden">
+              <div class="w-7 h-7 rounded-lg bg-slate-800 group-hover:bg-blue-600/20 text-slate-400 group-hover:text-blue-400 flex items-center justify-center shrink-0 transition">
+                <i data-lucide="file-check" class="w-3.5 h-3.5"></i>
+              </div>
+              <div class="truncate">
+                <p class="text-xs font-semibold text-slate-200 truncate">${sample.title}</p>
+                <p class="text-[10px] text-slate-400 truncate">${sample.description}</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 bg-slate-800 text-slate-300 border border-slate-700">
+              ${sample.tag}
+            </span>
+          `;
+          samplesContainer.appendChild(btn);
+        });
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Failed loading samples:', err);
+      }
+    }
+
+    function selectSampleCard(sample) {
+      selectedCardSample = sample.id;
+      selectedCardFile = null;
+      cardPreviewImg.src = `/api/sample/${encodeURIComponent(sample.id)}`;
+      cardPreviewName.textContent = sample.title;
+      dropEmptyState.classList.add('hidden');
+      dropPreviewState.classList.remove('hidden');
+    }
+
+    // 2. Drag & Drop Card Handling
+    dropZone.addEventListener('click', (e) => {
+      if (e.target !== clearCardBtn && !clearCardBtn.contains(e.target)) {
+        cardFileInput.click();
+      }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-blue-500');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-blue-500');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-500');
+      if (e.dataTransfer.files.length > 0) {
+        handleCardFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    cardFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleCardFile(e.target.files[0]);
+      }
+    });
+
+    function handleCardFile(file) {
+      selectedCardFile = file;
+      selectedCardSample = null;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        cardPreviewImg.src = e.target.result;
+        cardPreviewName.textContent = file.name;
+        dropEmptyState.classList.add('hidden');
+        dropPreviewState.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    clearCardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedCardFile = null;
+      selectedCardSample = null;
+      cardFileInput.value = '';
+      cardPreviewImg.src = '';
+      dropEmptyState.classList.remove('hidden');
+      dropPreviewState.classList.add('hidden');
+    });
+
+    // 3. Webcam Live Selfie Handlers
+    toggleCameraBtn.addEventListener('click', async () => {
+      if (webcamStream) {
+        stopWebcam();
+      } else {
+        await startWebcam();
+      }
+    });
+
+    async function startWebcam() {
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+        webcamVideo.srcObject = webcamStream;
+        webcamVideo.classList.remove('hidden');
+        webcamIdleState.classList.add('hidden');
+        selfiePreviewImg.classList.add('hidden');
+        captureSelfieBtn.disabled = false;
+        cameraBtnText.textContent = 'Stop Camera';
+      } catch (err) {
+        alert('Could not access webcam: ' + err.message);
+      }
+    }
+
+    function stopWebcam() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        webcamStream = null;
+      }
+      webcamVideo.classList.add('hidden');
+      if (!liveSelfieDataUrl) {
+        webcamIdleState.classList.remove('hidden');
+      }
+      captureSelfieBtn.disabled = true;
+      cameraBtnText.textContent = 'Start Webcam';
+    }
+
+    captureSelfieBtn.addEventListener('click', () => {
+      if (!webcamStream) return;
+      webcamCanvas.width = webcamVideo.videoWidth || 640;
+      webcamCanvas.height = webcamVideo.videoHeight || 480;
+      const ctx = webcamCanvas.getContext('2d');
+      ctx.drawImage(webcamVideo, 0, 0, webcamCanvas.width, webcamCanvas.height);
+      liveSelfieDataUrl = webcamCanvas.toDataURL('image/jpeg', 0.9);
+      
+      selfiePreviewImg.src = liveSelfieDataUrl;
+      selfiePreviewImg.classList.remove('hidden');
+      stopWebcam();
+      clearSelfieBtn.classList.remove('hidden');
+    });
+
+    clearSelfieBtn.addEventListener('click', () => {
+      liveSelfieDataUrl = null;
+      selfiePreviewImg.src = '';
+      selfiePreviewImg.classList.add('hidden');
+      webcamIdleState.classList.remove('hidden');
+      clearSelfieBtn.classList.add('hidden');
+    });
+
+    // 4. Execution Pipeline Trigger
+    runScreenBtn.addEventListener('click', async () => {
+      if (!selectedCardFile && !selectedCardSample) {
+        alert('Please upload an Aadhaar card image or select a demo sample card first.');
+        return;
+      }
+
+      // Show Loading State
+      resultsEmptyState.classList.add('hidden');
+      resultsContentState.classList.add('hidden');
+      resultsLoadingState.classList.remove('hidden');
+
+      const formData = new FormData();
+      if (selectedCardFile) {
+        formData.append('card_file', selectedCardFile);
+      } else if (selectedCardSample) {
+        formData.append('card_sample', selectedCardSample);
+      }
+
+      if (liveSelfieDataUrl) {
+        formData.append('live_data', liveSelfieDataUrl);
+      }
+
+      try {
+        const response = await fetch('/api/screen', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || 'Screening request failed.');
+        }
+
+        const report = await response.json();
+        renderResults(report);
+      } catch (err) {
+        alert('Pipeline Execution Error: ' + err.message);
+        resultsLoadingState.classList.add('hidden');
+        resultsEmptyState.classList.remove('hidden');
+      }
+    });
+
+    // 5. Render Screening Report to Dashboard
+    function renderResults(r) {
+      resultsLoadingState.classList.add('hidden');
+      resultsContentState.classList.remove('hidden');
+
+      // Top Verdict Banner
+      const banner = document.getElementById('verdict-banner');
+      const iconContainer = document.getElementById('verdict-icon-container');
+      const icon = document.getElementById('verdict-icon');
+      const title = document.getElementById('verdict-title');
+      const subtitle = document.getElementById('verdict-subtitle');
+      const hardRejectBadge = document.getElementById('hard-reject-badge');
+      const riskScoreValue = document.getElementById('risk-score-value');
+      const executionTimeLabel = document.getElementById('execution-time-label');
+
+      riskScoreValue.textContent = r.risk_score.toFixed(1);
+      executionTimeLabel.textContent = `Screened in ${r.execution_time_seconds}s`;
+
+      if (r.hard_reject) {
+        hardRejectBadge.classList.remove('hidden');
+      } else {
+        hardRejectBadge.classList.add('hidden');
+      }
+
+      if (r.verdict === 'VERIFIED') {
+        banner.className = 'rounded-2xl p-6 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-emerald-950/40 border-emerald-500/30 text-emerald-100';
+        iconContainer.className = 'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30';
+        icon.setAttribute('data-lucide', 'shield-check');
+        title.textContent = 'VERIFIED (CRYPTOGRAPHICALLY AUTHENTIC)';
+        title.className = 'text-2xl font-black tracking-tight mt-0.5 text-emerald-300';
+        subtitle.textContent = r.verdict_reason || 'All cryptographic signatures, demographic text, and biometric features verified authentic.';
+      } else if (r.verdict === 'RETAKE') {
+        banner.className = 'rounded-2xl p-6 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-indigo-950/40 border-indigo-500/30 text-indigo-100';
+        iconContainer.className = 'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-500/30';
+        icon.setAttribute('data-lucide', 'camera');
+        title.textContent = 'RETAKE REQUIRED (CAPTURE DEGRADED)';
+        title.className = 'text-2xl font-black tracking-tight mt-0.5 text-indigo-300';
+        subtitle.textContent = r.verdict_reason || 'Image capture is blurred, low-resolution, or poorly lit. Please retake a clear photo.';
+      } else if (r.verdict === 'REVIEW') {
+        banner.className = 'rounded-2xl p-6 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-amber-950/40 border-amber-500/30 text-amber-100';
+        iconContainer.className = 'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30';
+        icon.setAttribute('data-lucide', 'shield-alert');
+        title.textContent = 'MANUAL REVIEW REQUIRED (UNVERIFIABLE)';
+        title.className = 'text-2xl font-black tracking-tight mt-0.5 text-amber-300';
+        subtitle.textContent = r.verdict_reason || 'Document lacks a verified cryptographic anchor or exhibits soft anomalies. Secondary check required.';
+      } else {
+        banner.className = 'rounded-2xl p-6 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-red-950/40 border-red-500/30 text-red-100';
+        iconContainer.className = 'w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-red-500/20 text-red-400 ring-1 ring-red-500/30';
+        icon.setAttribute('data-lucide', 'shield-x');
+        title.textContent = 'REJECTED (FRAUD / TAMPER DETECTED)';
+        title.className = 'text-2xl font-black tracking-tight mt-0.5 text-red-300';
+        subtitle.textContent = r.verdict_reason || (r.hard_reject ? 'Instant Hard Reject triggered by cryptographic or biometric mismatch.' : 'Multiple critical anomalies detected.');
+      }
+
+      // Biometrics Hub
+      const bioCardFace = document.getElementById('bio-card-face');
+      const bioCardEmpty = document.getElementById('bio-card-empty');
+      if (r.card.photo_base64) {
+        bioCardFace.src = r.card.photo_base64;
+        bioCardFace.classList.remove('hidden');
+        bioCardEmpty.classList.add('hidden');
+      } else {
+        bioCardFace.classList.add('hidden');
+        bioCardEmpty.classList.remove('hidden');
+      }
+
+      const bioQrFace = document.getElementById('bio-qr-face');
+      const bioQrEmpty = document.getElementById('bio-qr-empty');
+      if (r.qr.photo_base64) {
+        bioQrFace.src = r.qr.photo_base64;
+        bioQrFace.classList.remove('hidden');
+        bioQrEmpty.classList.add('hidden');
+      } else {
+        bioQrFace.classList.add('hidden');
+        bioQrEmpty.classList.remove('hidden');
+      }
+
+      const bioLiveFace = document.getElementById('bio-live-face');
+      const bioLiveEmpty = document.getElementById('bio-live-empty');
+      if (r.live.photo_base64) {
+        bioLiveFace.src = r.live.photo_base64;
+        bioLiveFace.classList.remove('hidden');
+        bioLiveEmpty.classList.add('hidden');
+      } else {
+        bioLiveFace.classList.add('hidden');
+        bioLiveEmpty.classList.remove('hidden');
+      }
+
+      // Card <-> QR Pair
+      const pairCardQrScore = document.getElementById('pair-card-qr-score');
+      const pairCardQrBadge = document.getElementById('pair-card-qr-badge');
+      if (r.biometrics.card_qr_cosine_sim !== null && r.biometrics.card_qr_cosine_sim !== undefined) {
+        pairCardQrScore.textContent = `Sim: ${r.biometrics.card_qr_cosine_sim.toFixed(3)}`;
+        if (r.biometrics.card_qr_match) {
+          pairCardQrBadge.textContent = 'MATCH (AUTHENTIC)';
+          pairCardQrBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        } else {
+          pairCardQrBadge.textContent = 'PHOTO-SWAP FRAUD';
+          pairCardQrBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-red-500/20 text-red-400 border border-red-500/30 font-bold';
+        }
+      } else {
+        pairCardQrScore.textContent = 'N/A';
+        pairCardQrBadge.textContent = 'Standby';
+        pairCardQrBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-slate-800 text-slate-400';
+      }
+
+      // QR <-> Live Pair
+      const pairQrLiveScore = document.getElementById('pair-qr-live-score');
+      const pairQrLiveBadge = document.getElementById('pair-qr-live-badge');
+      if (r.biometrics.qr_live_cosine_sim !== null && r.biometrics.qr_live_cosine_sim !== undefined) {
+        pairQrLiveScore.textContent = `Sim: ${r.biometrics.qr_live_cosine_sim.toFixed(3)}`;
+        if (r.biometrics.qr_live_match) {
+          pairQrLiveBadge.textContent = 'IDENTITY CONFIRMED';
+          pairQrLiveBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        } else {
+          pairQrLiveBadge.textContent = 'IMPOSTOR FRAUD';
+          pairQrLiveBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-red-500/20 text-red-400 border border-red-500/30 font-bold';
+        }
+      } else {
+        pairQrLiveScore.textContent = 'N/A';
+        pairQrLiveBadge.textContent = 'Standby';
+        pairQrLiveBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full inline-block mt-0.5 bg-slate-800 text-slate-400';
+      }
+
+      // Cryptographic Card
+      const cryptoBadge = document.getElementById('crypto-validity-badge');
+      if (r.qr.signature_valid) {
+        cryptoBadge.textContent = 'RSA-2048 VALID';
+        cryptoBadge.className = 'text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+      } else {
+        cryptoBadge.textContent = r.qr.present ? 'SIGNATURE INVALID' : 'QR MISSING';
+        cryptoBadge.className = 'text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30';
+      }
+      document.getElementById('crypto-cert-name').textContent = r.qr.cert_name || 'No Matching Cert';
+      document.getElementById('crypto-timestamp').textContent = r.qr.issue_timestamp || 'N/A';
+      document.getElementById('crypto-version').textContent = r.qr.version || 'Standard';
+
+      // Cross-check Table
+      const tbody = document.getElementById('cross-check-table-body');
+      tbody.innerHTML = '';
+      r.cross_checks.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        const badgeColor = row.status === 'MATCH' 
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+          : (row.status === 'MISMATCH' ? 'bg-red-500/20 text-red-400 border-red-500/30 font-bold' : 'bg-slate-800 text-slate-400');
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-semibold text-slate-200">${row.field}</td>
+          <td class="py-2.5 px-3 text-slate-300">${row.ocr_value}</td>
+          <td class="py-2.5 px-3 text-blue-300 font-medium">${row.qr_value}</td>
+          <td class="py-2.5 px-3 text-right">
+            <span class="px-2 py-0.5 rounded-md text-[10px] border ${badgeColor}">${row.status}</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Verhoeff Pill
+      const vPill = document.getElementById('verhoeff-status-pill');
+      if (r.verhoeff.checked) {
+        if (r.verhoeff.valid) {
+          vPill.textContent = 'Verhoeff D5 Checksum: Valid';
+          vPill.className = 'text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        } else {
+          vPill.textContent = 'Verhoeff D5: Checksum Failed!';
+          vPill.className = 'text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 font-bold';
+        }
+      } else {
+        vPill.textContent = 'Verhoeff: Masked / Partial';
+        vPill.className = 'text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+      }
+
+      // Diagnostic Findings List
+      const diagList = document.getElementById('diagnostic-findings-list');
+      diagList.innerHTML = '';
+      if (r.flags.length === 0) {
+        diagList.innerHTML = '<p class="text-slate-400 italic">No diagnostic anomalies flagged.</p>';
+      } else {
+        r.flags.forEach(f => {
+          const div = document.createElement('div');
+          const isDanger = f.includes('FRAUD') || f.includes('Mismatch') || f.includes('FAILED');
+          const isSuccess = f.includes('Verified') || f.includes('Match') || f.includes('Confirmed');
+          
+          div.className = `p-2 rounded-lg border flex items-center space-x-2 ${
+            isDanger ? 'bg-red-950/30 border-red-500/30 text-red-300' : 
+            (isSuccess ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' : 'bg-slate-950/50 border-slate-800 text-slate-300')
+          }`;
+          div.innerHTML = `
+            <i data-lucide="${isDanger ? 'alert-triangle' : (isSuccess ? 'check-circle-2' : 'info')}" class="w-4 h-4 shrink-0"></i>
+            <span>${f}</span>
+          `;
+          diagList.appendChild(div);
+        });
+      }
+
+      lucide.createIcons();
+    }
+
+    // Load initial demo samples on page start
+    loadSamples();
+  </script>
+</body>
+</html>

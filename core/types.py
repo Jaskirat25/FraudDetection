@@ -9,6 +9,13 @@ from typing import Optional, Dict, List, Tuple, Any
 import numpy as np
 
 
+class Verdict(str, Enum):
+    VERIFIED = "VERIFIED"   # Cryptographically anchored & biometrically authenticated
+    REVIEW = "REVIEW"       # Unverifiable (legacy/no QR, cert unknown, or requires manual check)
+    RETAKE = "RETAKE"       # Capture degraded (unreadable QR, blur, face landmarks not found)
+    REJECT = "REJECT"       # Hard fraud detected (forged signature, photo swap, text mismatch)
+
+
 class RiskLevel(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
@@ -57,11 +64,13 @@ class ModuleResult:
 class RiskReport:
     """Final aggregated risk verdict and explainable report (L1-L5)."""
     overall_risk: RiskLevel
-    risk_score: float                                      # 0 to 100 aggregate points
-    hard_reject: bool                                      # True if triggered by conclusive cryptographic/checksum rule
-    tier1_violations: List[str]                            # Conclusive reasons (e.g., "Invalid RSA signature")
-    tier2_contributions: List[Dict[str, Any]]              # Weighted point breakdown
-    per_field_analysis: Dict[str, Dict[str, Any]]          # Value, QR match, Tamper score per field
-    flags: List[str]                                       # All plain-language findings
+    verdict: Verdict = Verdict.REVIEW                      # VERIFIED, REVIEW, RETAKE, REJECT
+    verdict_reason: str = ""                               # Plain-language verdict summary
+    risk_score: float = 0.0                                # 0 to 100 aggregate points
+    hard_reject: bool = False                              # True if triggered by conclusive cryptographic/checksum rule
+    tier1_violations: List[str] = field(default_factory=list) # Conclusive reasons (e.g., "Invalid RSA signature")
+    tier2_contributions: List[Dict[str, Any]] = field(default_factory=list) # Weighted point breakdown
+    per_field_analysis: Dict[str, Dict[str, Any]] = field(default_factory=dict) # Value, QR match, Tamper score per field
+    flags: List[str] = field(default_factory=list)          # All plain-language findings
     heatmap_overlay: Optional[np.ndarray] = None           # Visual heatmap representation
     metadata: Dict[str, Any] = field(default_factory=dict) # Processing time, timestamps, masked id

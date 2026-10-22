@@ -285,16 +285,39 @@ def _parse_secure_qr(raw_bytes: bytes, text_data: str) -> Tuple[Dict[str, str], 
         if note:
             payload["cert_timeline_status"] = note
 
-    # Extract Face Photo if present (JPEG2000 bytes)
-    for p in parts:
-        # Check JPEG or JPEG2000 signatures
-        if len(p) > 200:
-            if p.startswith(b"\xff\xd8") or p.startswith(b"\x00\x00\x00\x0c\x6a\x50\x20\x20"):
-                nparr = np.frombuffer(p, np.uint8)
-                decoded_pic = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                if decoded_pic is not None:
-                    photo_np = decoded_pic
-                    break
+    # Extract Face Photo if present (JPEG2000 codestream, standard JPEG, or JP2 container)
+    search_buffer = decompressed[:-256] if len(decompressed) > 256 else decompressed
+    photo_signatures = [
+        b"\xff\x4f\xff\x51",                  # JPEG 2000 SOC (Start of Codestream)
+        b"\xff\xd8\xff",                      # Standard JPEG SOI
+        b"\x00\x00\x00\x0c\x6a\x50\x20\x20",  # JPEG 2000 JP2 container
+    ]
+    for magic in photo_signatures:
+        pos = search_buffer.find(magic)
+        if pos != -1:
+            raw_img = search_buffer[pos:]
+            # Slice up to End of Image/Codestream marker (\xff\xd9) if present
+            end_pos = raw_img.find(b"\xff\xd9")
+            if end_pos != -1:
+                raw_img = raw_img[:end_pos + 2]
+            
+            # Primary decode: OpenCV
+            nparr = np.frombuffer(raw_img, np.uint8)
+            decoded_pic = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            # Secondary fallback: PIL
+            if decoded_pic is None or decoded_pic.size == 0:
+                try:
+                    import io
+                    from PIL import Image
+                    pil_img = Image.open(io.BytesIO(raw_img))
+                    decoded_pic = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+                except Exception:
+                    decoded_pic = None
+            
+            if decoded_pic is not None and decoded_pic.size > 0:
+                photo_np = decoded_pic
+                break
 
     return payload, photo_np, sig_valid
 

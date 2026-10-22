@@ -12,6 +12,10 @@ import cv2
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 from modules.register.roboflow_detector import detect_fields_with_roboflow
 from modules.ocr.ocr_extractor import extract_fields

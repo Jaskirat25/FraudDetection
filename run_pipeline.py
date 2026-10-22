@@ -13,6 +13,10 @@ import cv2
 
 # Ensure project root is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 from core.types import RiskReport
 from modules.register import register_card
@@ -60,9 +64,17 @@ def screen_aadhaar(card_img_path: str, live_img_path: str = None) -> RiskReport:
     photo_crop = next((c.image for c in crops if c.name == "photo"), None)
     face_res = verify_face(card_photo=photo_crop, live_photo=live_image, qr_photo=qr_res.photo)
     
-    # Step 7: Risk Scoring & Fusion (M8)
+    # Step 7: Risk Scoring & Fusion (M8 - Fail-Closed Decision Engine)
+    has_qr_crop = any(c.name == "qr_code" for c in crops)
     all_results = [rule_res, tamper_res, face_res]
-    report = compute_risk_report(all_results, field_data=ocr_fields, qr_payload=qr_res.payload)
+    report = compute_risk_report(
+        all_results,
+        field_data=ocr_fields,
+        qr_payload=qr_res.payload,
+        qr_result=qr_res,
+        has_qr_crop=has_qr_crop,
+        card_quality_score=reg_quality
+    )
     
     return report
 
@@ -81,9 +93,10 @@ def main():
     report = screen_aadhaar(args.image_path, args.live)
 
     # Pretty-print report summary
-    print(f"\n[VERDICT]: {report.overall_risk.value}")
-    print(f"[RISK SCORE]: {report.risk_score:.1f} / 100.0")
-    print(f"[HARD REJECT]: {report.hard_reject}")
+    print(f"\n[VERDICT]:       {report.verdict.value}")
+    print(f"[VERDICT REASON]: {report.verdict_reason}")
+    print(f"[RISK SCORE]:    {report.risk_score:.1f} / 100.0 (Risk Band: {report.overall_risk.value})")
+    print(f"[HARD REJECT]:   {report.hard_reject}")
     
     if report.tier1_violations:
         print(f"\n--- Conclusive Tier-1 Violations (Immediate Fraud) ---")

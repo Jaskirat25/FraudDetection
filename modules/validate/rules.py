@@ -59,15 +59,29 @@ def validate_rules(fields: Dict[str, Tuple[str, float]], qr: Optional[QRResult] 
         result.scores["aadhaar_no"] = 0.0
 
     # 2. QR Cryptographic & Cross-check Validation (L1)
-    if qr and qr.present and qr.payload:
+    qr_present = qr is not None and qr.present
+    is_secure = qr is not None and qr.is_secure_qr
+    sig_valid = qr is not None and qr.signature_valid
+    
+    result.evidence["qr_present"] = qr_present
+    result.evidence["is_secure_qr"] = is_secure
+    result.evidence["qr_signature_valid"] = sig_valid
+
+    if qr_present and qr.payload:
         # Check Signature Status
-        if qr.signature_valid:
-            result.scores["qr_signature"] = 0.0
-            result.flags.append("QR Signature Verified: Authenticated against UIDAI certificate.")
+        if is_secure:
+            if sig_valid:
+                result.scores["qr_signature"] = 0.0
+                result.flags.append("QR Signature Verified: Authenticated against UIDAI certificate.")
+            else:
+                # Conclusive Forgery: Secure QR signature failed verification
+                result.scores["qr_signature"] = 1.0
+                result.flags.append("FORGERY ALERT: UIDAI Secure QR RSA-2048 digital signature verification FAILED!")
+                result.hard_fail = True
         else:
-            # Unverified cert or key rotation mismatch -> Tier 2 point penalty, not instant hard fail
-            result.scores["qr_signature"] = 0.20
-            result.flags.append("QR Signature Unverified: Issuer cert mismatch or requires specific yearly cert bundle.")
+            # Legacy XML QR without digital signature -> Cannot be cryptographically verified
+            result.scores["qr_signature"] = 0.30
+            result.flags.append("Legacy XML QR detected: Unsigned format lacking UIDAI RSA-2048 cryptographic signature.")
 
         # Cross-check printed fields vs QR payload (Conclusive Tamper Check)
         qr_dob = qr.payload.get("dob", "")
@@ -102,7 +116,7 @@ def validate_rules(fields: Dict[str, Tuple[str, float]], qr: Optional[QRResult] 
                 result.scores["pin_state_mismatch"] = 0.15
 
     else:
-        result.flags.append("No readable Secure QR detected; relying on heuristic and visual checks.")
-        result.scores["qr_present"] = 0.15
+        result.flags.append("Cryptographic Anchor Missing: No readable QR code detected on card.")
+        result.scores["qr_missing"] = 0.50
 
     return result

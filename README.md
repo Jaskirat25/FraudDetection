@@ -123,9 +123,20 @@ python test_qr.py "path/to/card_image.jpg"
 python test_ocr.py "path/to/card_image.jpg"
 ```
 
+#### Test 3-Way Face Biometric Matching (M7):
+```bash
+python test_face.py "path/to/card_image.jpg" [--live "path/to/selfie.jpg"]
+```
+
 #### Run Complete End-to-End Screening Pipeline:
 ```bash
-python run_pipeline.py "path/to/card_image.jpg"
+python run_pipeline.py "path/to/card_image.jpg" [--live "path/to/selfie.jpg"]
+```
+
+#### Launch Interactive Web Dashboard (M9):
+```bash
+python run_web.py
+# Open http://127.0.0.1:8000 in your browser
 ```
 
 ---
@@ -137,8 +148,8 @@ python run_pipeline.py "path/to/card_image.jpg"
 - [x] **M4: OCR & Text Parsing** — Enhanced EasyOCR with unsharp masking and name lexicon.
 - [x] **M5: Deterministic Rules** — Verhoeff check digit algorithm & PIN-to-state lookup.
 - [x] **M3: Cryptographic Core** — V5 Secure QR decoding, 8-cert Trust Store, temporal key binding, RSA-2048 verification.
-- [ ] **M7: Face Biometrics** — ArcFace 3-way identity verification (In Progress).
-- [ ] **M9: Web Interface** — Interactive FastAPI drag-and-drop screening dashboard.
+- [x] **M7: Face Biometrics** — 3-Way identity verification (Card Photo ↔ QR Photo ↔ Live Selfie) with YuNet alignment and SFace cosine similarity.
+- [x] **M9: Web Interface** — Interactive FastAPI drag-and-drop screening dashboard with webcam live capture.
 
 ---
 

@@ -60,5 +60,6 @@ htmlcov/
 # pip / dependency cache
 pip-wheel-metadata/
 
-# Optional: allow committed templates if needed
-# data/templates/
+# Model weights and test crops
+data/models/*.onnx
+data/test_crops/
