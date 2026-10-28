@@ -1,0 +1,327 @@
+# Passport Module Rules Registry
+# Versioned registry with provenance tracking for Indian Passport rules.
+# Promotion gate: Any rule where source is null or last_verified is null is unverified
+# and CANNOT escalate beyond INFO severity.
+
+ruleset_version: "ruleset-2026-10"
+updated_at: "2026-10-28"
+
+rules:
+  - id: "C-1-mrz-structure"
+    description: "ICAO Doc 9303 Part 4 TD3 MRZ structure (2 lines x 44 chars, charset A-Z0-9<, begins with P)"
+    source: "ICAO Doc 9303 Part 4, Section 4.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_mrz_structure_valid"
+      - "tests/test_passport_mrz.py::test_mrz_structure_invalid"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-2-state-nationality"
+    description: "Indian Passport issuing state and nationality must be 'IND'"
+    source: "Passports Act 1967 & ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_state_nationality_valid"
+      - "tests/test_passport_mrz.py::test_state_nationality_invalid"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-3-passport-number-checksum"
+    description: "7-3-1 modulo 10 check digit for passport number (pos 1-9 check at pos 10)"
+    source: "ICAO Doc 9303 Part 4, Section 4.2.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_passport_number_check_digit"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-4-dob-checksum"
+    description: "7-3-1 modulo 10 check digit for date of birth (pos 14-19 check at pos 20)"
+    source: "ICAO Doc 9303 Part 4, Section 4.2.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_dob_check_digit"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-5-expiry-checksum"
+    description: "7-3-1 modulo 10 check digit for date of expiry (pos 22-27 check at pos 28)"
+    source: "ICAO Doc 9303 Part 4, Section 4.2.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_expiry_check_digit"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-6-personal-number-blank"
+    description: "Check-digit value when personal number field is blank (all '<' filler)"
+    source: null
+    last_verified: null
+    supported_editions: ["ALL"]
+    severity: "INFO" # Kept at INFO until officially verified against Indian physical specimen editions
+    allow_zero_or_filler: true
+    tests:
+      - "tests/test_passport_mrz.py::test_personal_number_blank"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-7-composite-checksum"
+    description: "7-3-1 modulo 10 composite check digit over positions 1-10, 14-20, 22-43 at pos 44"
+    source: "ICAO Doc 9303 Part 4, Section 4.2.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_composite_check_digit"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-8-name-field-parse"
+    description: "Primary identifier (surname) and secondary identifier (given names) separated by first '<<'"
+    source: "ICAO Doc 9303 Part 4, Section 4.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T2"
+    allow_single_name: true
+    tests:
+      - "tests/test_passport_mrz.py::test_name_parsing"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-9-sex-field"
+    description: "Sex indicator must be 'M' (male), 'F' (female), or '<' (unspecified)"
+    source: "ICAO Doc 9303 Part 4, Section 4.2"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    allowed_values: ["M", "F", "<"]
+    tests:
+      - "tests/test_passport_mrz.py::test_sex_field"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-10-date-validity-century"
+    description: "Calendar validity check and century candidate resolution (19YY/20YY)"
+    source: "ICAO Doc 9303 Part 4 & Calendar Rules"
+    last_verified: "2026-10-27"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_mrz.py::test_date_validity_and_century"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "C-11-mrz-repair"
+    description: "Evidence-preserving OCR confusion repair gated by checksums and VIZ corroboration"
+    source: "ICAO Doc 9303 Part 4 & Multi-modal Cross-validation Spec"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "INFO" # Logs audit evidence of repairs
+    max_edits: 2
+    tests:
+      - "tests/test_passport_repair.py::test_repair_ocr_confusion"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-1-passport-number-format"
+    description: "Indian passport number format: 1 letter (excluding Q, X, Z) followed by 7 digits"
+    pattern: "^[A-PR-WY][1-9]\\d{6}$"
+    source: null # Candidate pattern, not officially ratified across all historical booklet series
+    last_verified: null
+    supported_editions: []
+    severity: "INFO" # Promotion gate: Must remain INFO until officially verified
+    tests:
+      - "tests/test_passport_rules.py::test_unverified_rule_promotion_gate"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-2-date-formats"
+    description: "VIZ printed date format DD/MM/YYYY and calendar sanity"
+    source: "MEA Passport Seva Guidelines"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_viz.py::test_viz_date_format_valid"
+      - "tests/test_passport_viz.py::test_viz_date_format_invalid"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-3-dob-plausibility"
+    description: "VIZ DOB plausibility: not in future and age between 0 and 115"
+    source: "MEA Passport Rules 1980"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_viz.py::test_dob_plausibility"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-4-date-ordering"
+    description: "Chronological consistency: DOB < Date of Issue < Date of Expiry"
+    source: "MEA Passport Rules 1980 & Passports Act 1967"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_viz.py::test_date_ordering"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-5-issue-date-plausibility"
+    description: "VIZ Date of Issue cannot be in the future relative to screening date"
+    source: "Passports Act 1967"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_viz.py::test_issue_date_not_in_future"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-6-validity-period"
+    description: "Passport validity period rules (Adult: 10 years; Minor: 5 years or until age 18)"
+    source: null # Unverified table
+    last_verified: null
+    supported_editions: ["ALL"]
+    severity: "INFO" # Promotion gate
+    validity_table:
+      adult_max_years: 10
+      minor_max_years: 5
+    tests: []
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-7-expiry-status"
+    description: "Flags document as EXPIRED if current date exceeds Date of Expiry (administrative flag)"
+    source: "Passports Act 1967"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "INFO" # Administrative flag, does not trigger fraud escalation
+    tests:
+      - "tests/test_passport_viz.py::test_expiry_status_flag"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "D-10-nationality-literal"
+    description: "Printed VIZ nationality must be 'INDIAN'"
+    source: "Passports Act 1967"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_viz.py::test_nationality_literal"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-1-xval-passport-no"
+    description: "VIZ passport number matches MRZ passport number exactly"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_passport_number"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-2-xval-surname"
+    description: "VIZ surname matches MRZ primary identifier after transliteration"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_surname"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-3-xval-given-names"
+    description: "VIZ given names match MRZ secondary identifier (allowing truncation at field boundary)"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_given_names"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-4-xval-dob"
+    description: "VIZ DOB DD/MM/YYYY matches MRZ YYMMDD with 4-digit century corroboration"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_dob"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-5-xval-expiry"
+    description: "VIZ Expiry Date DD/MM/YYYY matches MRZ YYMMDD"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_expiry"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-6-xval-sex"
+    description: "VIZ printed sex matches MRZ sex field"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_sex"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "E-7-xval-nationality"
+    description: "VIZ nationality 'INDIAN' matches MRZ nationality 'IND'"
+    source: "ICAO Doc 9303 Part 4"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_cross_val.py::test_xval_nationality"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "A-2-image-quality"
+    description: "Quality gate: blur (Laplacian variance), glare mask, and minimum resolution"
+    source: "ICAO Doc 9303 Part 4 & IDShield Quality Gate"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "INFO" # Quality failures trigger RECAPTURE_REQUIRED, not risk points
+    tests:
+      - "tests/test_passport_quality.py::test_quality_gate_clean"
+      - "tests/test_passport_quality.py::test_quality_gate_blur"
+    owner: "IDShield-Passport"
+    version: 1
+
+  - id: "I-6-reuse-detection"
+    description: "Keyed-HMAC cross-submission duplicate and demographic mismatch detection"
+    source: "Section 8 Privacy & History Architecture"
+    last_verified: "2026-10-28"
+    supported_editions: ["ALL"]
+    severity: "T1"
+    tests:
+      - "tests/test_passport_privacy.py::test_reuse_index_demographic_mismatch"
+    owner: "IDShield-Passport"
+    version: 1

@@ -103,7 +103,7 @@ def extract_fields(crops: List[FieldCrop]) -> Dict[str, Tuple[str, float]]:
     results: Dict[str, Tuple[str, float]] = {}
     reader = _get_en_reader()
 
-    TARGET_FIELDS = {"aadhaar_no", "dob", "gender", "name_en"}
+    TARGET_FIELDS = {"aadhaar_no", "dob", "gender", "name_en", "aadhar-address", "address"}
 
     for crop in crops:
         if crop.name not in TARGET_FIELDS:
@@ -152,6 +152,14 @@ def extract_fields(crops: List[FieldCrop]) -> Dict[str, Tuple[str, float]]:
 
         elif crop.name == "name_en":
             extracted_text = clean_name_string(extracted_text)
+
+        elif crop.name in ("aadhar-address", "address"):
+            # Extract 6-digit PIN code if present in address text
+            pin_match = re.search(r"\b([1-9]\d{5})\b", extracted_text)
+            if pin_match:
+                results["pincode"] = (pin_match.group(1), round(confidence, 3))
+            results["address"] = (extracted_text, round(confidence, 3))
+            continue
 
         results[crop.name] = (extracted_text, round(confidence, 3))
 

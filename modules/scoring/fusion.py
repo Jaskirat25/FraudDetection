@@ -77,6 +77,15 @@ def compute_risk_report(
                 pts = RISK_WEIGHTS.get("tamper_general_high", 15.0)
                 tier2_contributions.append({"reason": f"High suspicion in {field_name}", "points": pts})
                 total_score += pts
+        elif s >= 0.35:
+            if field_name in ("state_mismatch", "pin_mismatch", "dob_mismatch", "name_mismatch", "pin_state_mismatch"):
+                pts = 35.0  # Bumps into MEDIUM risk / REVIEW band (30-59)
+                tier2_contributions.append({"reason": f"Demographic or address discrepancy in {field_name}", "points": pts})
+                total_score += pts
+            else:
+                pts = 15.0
+                tier2_contributions.append({"reason": f"Moderate anomaly in {field_name}", "points": pts})
+                total_score += pts
 
     # Extract cryptographic & biometric evidence
     qr_present = merged_evidence.get("qr_present", qr_result.present if qr_result else False)
@@ -108,11 +117,15 @@ def compute_risk_report(
         total_score = max(total_score, 35.0)
         verdict_reason = "RETAKE REQUIRED: Cardholder photograph is too degraded or dark to localize facial landmarks. Please submit a clearer image."
 
-    elif card_quality_score < 0.60:
+    elif card_quality_score < 0.60 or any("RETAKE ADVICE" in f for f in all_flags):
         verdict = Verdict.RETAKE
         overall_risk = RiskLevel.MEDIUM
         total_score = max(total_score, 35.0)
-        verdict_reason = "RETAKE REQUIRED: Overall document capture quality is degraded or distorted. Please retake a flat, centered photo."
+        retake_flags = [f for f in all_flags if "RETAKE ADVICE" in f]
+        if retake_flags:
+            verdict_reason = f"RETAKE REQUIRED: {retake_flags[0]}"
+        else:
+            verdict_reason = "RETAKE REQUIRED: Overall document capture quality is degraded or distorted. Please retake a flat, centered photo."
 
     # State 3: Missing Cryptographic Anchor -> REVIEW (FAIL CLOSED: Can NEVER be VERIFIED)
     elif not is_secure_qr or not qr_sig_valid:

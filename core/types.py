@@ -47,6 +47,11 @@ class QRResult:
     payload: Dict[str, str] = field(default_factory=dict)  # Demographics (name, dob, gender, address, last4, etc.)
     photo: Optional[np.ndarray] = None  # Extracted compressed face photo (JPEG2000)
     raw_text: Optional[str] = None
+    signature_status: str = "NO_QR"     # "VALID", "INVALID_SIGNATURE", "UNKNOWN_KEY", "UNSIGNED_LEGACY", "NO_QR"
+    cert_name: Optional[str] = None
+    cert_fingerprint: Optional[str] = None
+    temporal_valid: bool = True
+    temporal_issues: List[str] = field(default_factory=list)
     flags: List[str] = field(default_factory=list)
 
 

@@ -9,11 +9,12 @@ Compares:
 import os
 import urllib.request
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 import numpy as np
 import cv2
 
 from core.types import ModuleResult
+from modules.face.liveness import detect_face_liveness, LivenessResult
 
 # Default SFace Cosine Similarity Threshold (standard recommended by OpenCV Zoo is 0.363)
 # Cosine similarity > 0.363 means same person.
@@ -158,18 +159,56 @@ def compare_embeddings(feat1: np.ndarray, feat2: np.ndarray) -> Tuple[float, flo
 def verify_face(
     card_photo: Optional[np.ndarray],
     live_photo: Optional[np.ndarray] = None,
-    qr_photo: Optional[np.ndarray] = None
+    qr_photo: Optional[np.ndarray] = None,
+    live_frames: Optional[List[np.ndarray]] = None
 ) -> ModuleResult:
     """
-    Performs 3-Way Face Verification:
+    Performs 3-Way Face Verification & Presentation Attack Detection (L5):
     1. Card Photo <-> QR Photo (Detects Photo-Swap: Tier 1 Hard Reject)
     2. Card Photo <-> Live Selfie (Detects Impostor: Tier 2 Flag)
     3. QR Photo <-> Live Selfie (Cryptographic Anchor: Tier 1 Hard Reject)
+    4. Biometric Liveness / Anti-Spoofing (ISO/IEC 30107-3 PAD: Tier 1 Hard Reject)
     """
     result = ModuleResult(module_name="face_verification")
     result.evidence["threshold_cosine"] = SFACE_COSINE_THRESHOLD
 
-    # 1. Extract Embeddings
+    # Determine live frames burst vs single frame
+    if live_frames is not None and len(live_frames) > 0:
+        if live_photo is None:
+            live_photo = live_frames[-1]
+        liveness_input = live_frames
+    elif live_photo is not None:
+        liveness_input = [live_photo]
+    else:
+        liveness_input = None
+
+    # 1. Execute Biometric Presentation Attack Detection (PAD)
+    if liveness_input is not None:
+        detector, _ = _get_models()
+        pad_res = detect_face_liveness(liveness_input, detector=detector)
+        result.evidence["liveness"] = {
+            "is_live": pad_res.is_live,
+            "liveness_score": pad_res.liveness_score,
+            "attack_type": pad_res.attack_type,
+            "apcer_risk": pad_res.apcer_risk,
+            "scores": pad_res.scores,
+            "details": pad_res.details
+        }
+        result.flags.extend(pad_res.flags)
+
+        if not pad_res.is_live:
+            result.hard_fail = True
+            result.scores["liveness_spoof"] = 1.0
+            result.flags.append(
+                f"PRESENTATION ATTACK FRAUD: Live face failed Presentation Attack Detection "
+                f"(Attack Classification: {pad_res.attack_type}, Score: {pad_res.liveness_score:.2f})."
+            )
+        else:
+            result.scores["liveness_spoof"] = 0.0
+            if pad_res.liveness_score < 0.65:
+                result.scores["liveness_borderline"] = 0.35
+
+    # 2. Extract Embeddings
     card_feat, card_aligned = extract_face_embedding(card_photo)
     qr_feat, qr_aligned = extract_face_embedding(qr_photo)
     live_feat, live_aligned = extract_face_embedding(live_photo)

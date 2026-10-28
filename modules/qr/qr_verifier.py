@@ -7,6 +7,7 @@ Supports:
 4. Cryptographic cross-check against printed OCR text.
 """
 
+import sys
 import zlib
 import re
 import xml.etree.ElementTree as ET
@@ -14,6 +15,9 @@ from typing import Optional, Dict, Tuple, List, Any
 import numpy as np
 import cv2
 from core.types import QRResult, FieldCrop
+
+if hasattr(sys, "set_int_max_str_digits"):
+    sys.set_int_max_str_digits(50000)
 
 
 def _decode_qr_image(qr_img: np.ndarray) -> Optional[Tuple[bytes, str]]:
@@ -73,43 +77,12 @@ def _decode_qr_image(qr_img: np.ndarray) -> Optional[Tuple[bytes, str]]:
     return None
 
 
-# Cached Public Keys Trust Store
-_TRUSTED_PUBLIC_KEYS = None
-
-
-def _get_trusted_public_keys():
-    """Loads all UIDAI certificates (.cer / .pem) from data/certs/ with their validity windows."""
-    global _TRUSTED_PUBLIC_KEYS
-    if _TRUSTED_PUBLIC_KEYS is None:
-        _TRUSTED_PUBLIC_KEYS = []
-        from pathlib import Path
-        from datetime import datetime, timezone
-        cert_dir = Path(__file__).resolve().parent.parent.parent / "data" / "certs"
-        
-        if cert_dir.exists():
-            from cryptography.x509 import load_der_x509_certificate, load_pem_x509_certificate
-            candidate_files = list(cert_dir.glob("*.cer")) + list(cert_dir.glob("*.pem")) + list(cert_dir.glob("*.crt"))
-            for cert_file in candidate_files:
-                try:
-                    data = cert_file.read_bytes()
-                    try:
-                        cert = load_der_x509_certificate(data)
-                    except Exception:
-                        cert = load_pem_x509_certificate(data)
-                    
-                    # Extract UTC validity window
-                    valid_from = cert.not_valid_before_utc if hasattr(cert, 'not_valid_before_utc') else cert.not_valid_before.replace(tzinfo=timezone.utc)
-                    valid_to = cert.not_valid_after_utc if hasattr(cert, 'not_valid_after_utc') else cert.not_valid_after.replace(tzinfo=timezone.utc)
-
-                    _TRUSTED_PUBLIC_KEYS.append({
-                        "name": cert_file.name,
-                        "pub_key": cert.public_key(),
-                        "valid_from": valid_from,
-                        "valid_to": valid_to
-                    })
-                except Exception as e:
-                    print(f"[Crypto] Notice: Could not load {cert_file.name}: {e}")
-    return _TRUSTED_PUBLIC_KEYS
+from .trust_store import (
+    load_pinned_trust_store,
+    verify_uidai_signature_pinned,
+    validate_temporal_plausibility,
+    PINNED_UIDAI_CERTIFICATES,
+)
 
 
 def _parse_issue_timestamp_from_ref_id(ref_id: str):
@@ -128,56 +101,6 @@ def _parse_issue_timestamp_from_ref_id(ref_id: str):
             pass
     return None, None
 
-
-def _verify_uidai_rsa_signature(
-    payload_bytes: bytes,
-    signature_bytes: bytes,
-    issue_dt=None
-) -> Tuple[bool, Optional[str], Optional[str]]:
-    """
-    Deterministic Key Selection:
-    1. Filters for certificates whose active window covers the card's issue timestamp.
-    2. Verifies RSA-2048 signature against the matched certificate.
-    Returns: (is_valid, matching_cert_name, anomaly_note)
-    """
-    keys = _get_trusted_public_keys()
-    if not keys:
-        return False, None, "No certificates found in data/certs trust store."
-
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives import hashes
-
-    # Step A: Filter by timestamp if issue date is present
-    target_keys = []
-    if issue_dt is not None:
-        for k in keys:
-            if k["valid_from"] <= issue_dt <= k["valid_to"]:
-                target_keys.append(k)
-
-        if not target_keys:
-            note = f"Temporal Anomaly: Card claims issue date {issue_dt.strftime('%Y-%m-%d')}, but no UIDAI certificate in trust store was active on that date."
-            # Fall back to testing all keys just in case clock drift or unparsed timezone
-            target_keys = keys
-        else:
-            note = f"Active Certificate Matched for Issue Date {issue_dt.strftime('%Y-%m-%d')}."
-    else:
-        target_keys = keys
-        note = None
-
-    # Step B: Cryptographic RSA Verification
-    for k in target_keys:
-        try:
-            k["pub_key"].verify(
-                signature_bytes,
-                payload_bytes,
-                padding.PKCS1v15(),
-                hashes.SHA256()
-            )
-            return True, k["name"], f"Verified by active cert: {k['name']}"
-        except Exception:
-            continue
-
-    return False, None, note
 
 
 def _parse_xml_qr(xml_text: str) -> Dict[str, str]:
@@ -275,15 +198,32 @@ def _parse_secure_qr(raw_bytes: bytes, text_data: str) -> Tuple[Dict[str, str], 
     if issue_str:
         payload["issue_timestamp"] = issue_str
 
-    # 5. Check RSA-2048 digital signature with Temporal Key Matching
+    # 5. Check RSA-2048 digital signature with Pinned Trust Store Matching (L7)
+    sig_status = "NOT_CHECKED"
+    matching_cert = None
+    cert_fp = None
+    note = None
+
     if len(decompressed) > 256:
         data_payload = decompressed[:-256]
         signature_bytes = decompressed[-256:]
-        sig_valid, matching_cert, note = _verify_uidai_rsa_signature(data_payload, signature_bytes, issue_dt=issue_dt)
+        sig_status, matching_cert, cert_fp, note = verify_uidai_signature_pinned(
+            data_payload, signature_bytes, issue_dt=issue_dt
+        )
+        sig_valid = (sig_status == "VALID")
         if matching_cert:
             payload["verified_by_cert"] = matching_cert
+        if cert_fp:
+            payload["cert_fingerprint"] = cert_fp
         if note:
             payload["cert_timeline_status"] = note
+
+    # 6. Temporal Plausibility & Freshness Validation (L8)
+    temp_valid, temp_issues = validate_temporal_plausibility(
+        issue_dt=issue_dt,
+        dob_str=payload.get("dob"),
+        is_v5_qr=True
+    )
 
     # Extract Face Photo if present (JPEG2000 codestream, standard JPEG, or JP2 container)
     search_buffer = decompressed[:-256] if len(decompressed) > 256 else decompressed
@@ -319,7 +259,7 @@ def _parse_secure_qr(raw_bytes: bytes, text_data: str) -> Tuple[Dict[str, str], 
                 photo_np = decoded_pic
                 break
 
-    return payload, photo_np, sig_valid
+    return payload, photo_np, sig_valid, sig_status, matching_cert, cert_fp, temp_valid, temp_issues
 
 
 def decode_and_verify_qr(
@@ -328,7 +268,7 @@ def decode_and_verify_qr(
 ) -> QRResult:
     """
     Decodes QR code from either the whole card or the cropped QR region.
-    Unpacks demographics, face photo, and signature validity.
+    Unpacks demographics, face photo, pinned cryptographic validity, and temporal checks.
     """
     decoded = None
 
@@ -347,6 +287,7 @@ def decode_and_verify_qr(
             is_secure_qr=False,
             payload={},
             photo=None,
+            signature_status="NO_QR",
             flags=["No readable QR code found in card scan."]
         )
 
@@ -362,12 +303,19 @@ def decode_and_verify_qr(
             payload=payload,
             photo=None,
             raw_text=text_data[:80],
+            signature_status="UNSIGNED_LEGACY",
             flags=["Legacy XML QR Code (Pre-2019, Unsigned)."]
         )
 
     # Branch 2: Secure QR (V4 / V5)
-    payload, photo_np, sig_valid = _parse_secure_qr(raw_bytes, text_data)
+    payload, photo_np, sig_valid, sig_status, cert_name, cert_fp, temp_valid, temp_issues = _parse_secure_qr(raw_bytes, text_data)
     if payload and payload.get("name"):
+        flags = [f"Secure QR Code ({payload.get('version', '2019+')} RSA Signed)."]
+        if cert_name:
+            flags.append(f"Trust Store Pin: {cert_name}")
+        if not temp_valid:
+            flags.extend(temp_issues)
+
         return QRResult(
             present=True,
             signature_valid=sig_valid,
@@ -375,7 +323,12 @@ def decode_and_verify_qr(
             payload=payload,
             photo=photo_np,
             raw_text=text_data[:40] + "...",
-            flags=[f"Secure QR Code ({payload.get('version', '2019+')} RSA Signed)."]
+            signature_status=sig_status,
+            cert_name=cert_name,
+            cert_fingerprint=cert_fp,
+            temporal_valid=temp_valid,
+            temporal_issues=temp_issues,
+            flags=flags
         )
 
     return QRResult(
@@ -385,6 +338,7 @@ def decode_and_verify_qr(
         payload={"raw": text_data[:100]},
         photo=None,
         raw_text=text_data[:60],
+        signature_status="INVALID_SIGNATURE",
         flags=["Unrecognized QR payload format."]
     )
 
