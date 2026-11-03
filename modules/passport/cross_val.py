@@ -293,6 +293,8 @@ class CrossValidator:
         def comp_sex(viz, mrz):
             v_s = viz.strip().upper()[0] if viz else ""
             m_s = mrz.strip().upper()
+            if not v_s or not m_s or m_s in ("<", ""):
+                return True, f"VIZ '{v_s}' vs MRZ '{m_s}' (unspecified/compatible)"
             return (v_s == m_s), f"VIZ '{v_s}' vs MRZ '{m_s}'"
 
         v_sex = viz_result.fields.get("sex", FieldObject("sex")).normalized

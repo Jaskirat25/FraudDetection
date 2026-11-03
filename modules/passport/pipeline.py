@@ -78,12 +78,18 @@ def screen_passport(
         ocr_conf = 1.0
     else:
         mrz_crop = crops.get("mrz")
-        line1, line2, ocr_conf = extract_mrz_text(mrz_crop.image) if mrz_crop else ("", "", 0.0)
+        line1, line2, ocr_conf = extract_mrz_text(
+            mrz_crop.image if mrz_crop else None,
+            full_image=image if image is not None else rectified_img,
+        )
 
     if provided_viz:
         viz_data = provided_viz
     else:
-        viz_extracted = extract_viz_fields(crops)
+        viz_extracted = extract_viz_fields(
+            crops,
+            full_image=image if image is not None else rectified_img,
+        )
         viz_data = {k: v[0] for k, v in viz_extracted.items()}
 
     # Extract 4-digit VIZ year hints for century resolution
